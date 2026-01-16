@@ -12,6 +12,7 @@ embeddings_store/
 # PDFs y notas
 *.pdf
 *.md
+!README.md
 
 # Sistema
 .DS_Store

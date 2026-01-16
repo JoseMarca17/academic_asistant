@@ -1,2 +1,7 @@
-VAULT_PATH = "C:/Users/Jose/Drive/ObsidianVault"
+VAULT_PATH = r"G:\My Drive\ObsidianVault"
+EXCLUDED_FOLDERS = {
+    "Templates",
+    ".obsidian",
+    ".trash"
+} 
 EMBEDDINGS_PATH = "./embeddings_store"
