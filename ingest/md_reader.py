@@ -63,6 +63,6 @@ def save_json(data, output_path):
         json.dump(data, f, indent=4, ensure_ascii=False)
     print(f"[+] Guardadas {len(data)} notas en {output_path}")
 
-if __name__ == "__main__":
-    notes = walk_vault(VAULT_PATH)
-    save_json(notes, OUTPUT_PATH)
+# if __name__ == "__main__":
+#     notes = walk_vault(VAULT_PATH)
+#     save_json(notes, OUTPUT_PATH)
