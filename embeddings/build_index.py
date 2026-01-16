@@ -1,64 +1,60 @@
-import json
-import os
-from sentence_transformers import SentenceTransformer
 import chromadb
+from sentence_transformers import SentenceTransformer
 
+COLLECTION_NAME = "academic_knowledge"
+TOP_K = 3
+PREVIEW_LENGTH = 200  
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "../data/processed/unified.json")
-DATA_PATH = os.path.normpath(DATA_PATH)
+client = chromadb.Client()
+collection = client.get_or_create_collection(COLLECTION_NAME)
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
+def query_text(text, top_k=TOP_K):
+    
+    if collection.count() == 0:
+        print("[!] La colección está vacía. Ejecuta build_index.py primero.")
+        return []
 
-CHUNK_SIZE = 500  
-CHUNK_OVERLAP = 50  
+    emb = model.encode(text).tolist()
 
-def chunk_text(text, size=CHUNK_SIZE, overlap=CHUNK_OVERLAP):
-    words = text.split()
-    i = 0
-    while i < len(words):
-        chunk = words[i:i+size]
-        yield " ".join(chunk)
-        i += size - overlap
+    results = collection.query(
+        query_embeddings=[emb],
+        n_results=top_k
+    )
 
-def load_json(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    docs = []
+    documents = results.get('documents', [[]])[0]
+    metadatas = results.get('metadatas', [[]])[0]
 
-def main():
-    print("[*] Cargando datos...")
-    if not os.path.exists(DATA_PATH):
-        print(f"[!] No se encontró {DATA_PATH}. Ejecutá primero unify_data.py")
-        return
+    if not documents:
+        print("[!] No se encontraron resultados para tu búsqueda.")
+        return []
 
-    docs = load_json(DATA_PATH)
-    print(f"[+] {len(docs)} documentos cargados")
+    for doc, metadata in zip(documents, metadatas):
+        docs.append({
+            "texto": doc,
+            "ruta": metadata.get("ruta", "Desconocida"),
+            "tipo": metadata.get("tipo", "Desconocido")
+        })
 
-    print("[*] Inicializando modelo de embeddings...")
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-    print("[+] Modelo cargado")
-
-    print("[*] Conectando con ChromaDB...")
-    client = chromadb.Client()
-    collection = client.get_or_create_collection(name="academic_knowledge")
-    print("[+] Conexión lista")
-
-    total_chunks = 0
-    for doc_id, doc in enumerate(docs):
-        for i, chunk in enumerate(chunk_text(doc["contenido"])):
-            total_chunks += 1
-            embedding = model.encode(chunk).tolist()
-            collection.add(
-                documents=[chunk],
-                embeddings=[embedding],
-                metadatas=[{
-                    "ruta": doc["ruta"],
-                    "tipo": doc["tipo"]
-                }],
-                ids=[f"{doc_id}_{i}"]
-            )
-            if i % 5 == 0:
-                print(f"[>] Procesando doc {doc_id}, chunk {i}")
-
-    print(f"[+] Proceso finalizado. Total de chunks indexados: {total_chunks}")
+    print(f"[+] Se encontraron {len(docs)} resultados.")
+    return docs
 
 if __name__ == "__main__":
-    main()
+    while True:
+        try:
+            pregunta = input("🔹 Qué quieres buscar? (escribe 'salir' para terminar) ")
+            if pregunta.lower() in {"salir", "exit"}:
+                break
+
+            resultados = query_text(pregunta)
+
+            for i, r in enumerate(resultados, 1):
+                preview = r['texto'][:PREVIEW_LENGTH].replace("\n", " ")
+                print(f"{i}. [{r['tipo']}] {r['ruta']}: {preview}...")
+
+        except KeyboardInterrupt:
+            print("\n[!] Interrupción manual. Saliendo...")
+            break
+        except Exception as e:
+            print(f"[!] Error inesperado: {e}")
