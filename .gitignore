@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.env
+venv/
+env/
+
+# Datos
+data/
+embeddings_store/
+
+# PDFs y notas
+*.pdf
+*.md
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
