@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Asistant</title>
+</head>
+<body>
+    <h1>Academic Chat</h1>
+    <form id="formBusqueda">
+        <input type="text" id="texto" placeholder="Realiza tu consulta">
+        <button type="submit">Buscar</button>
+    </form> 
+
+    <pre id="resultado"></pre>
+
+    <script>
+        document.getElementById("formBusqueda").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const texto = document.getElementById("texto").value;
+            const res = await fetch("/query", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ texto })
+            });
+            const data = await res.json();
+            document.getElementById("resultado").textContent = JSON.stringify(data, null, 2)
+        }
+    ) 
+    </script>
+</body>
+</html>

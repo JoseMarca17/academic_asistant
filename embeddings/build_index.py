@@ -1,60 +1,59 @@
+import os
+import json
 import chromadb
 from sentence_transformers import SentenceTransformer
 
 COLLECTION_NAME = "academic_knowledge"
-TOP_K = 3
-PREVIEW_LENGTH = 200  
+VAULT_PATH = "data/processed/unified.json"  
+MODEL_NAME = "all-MiniLM-L6-v2"
 
 client = chromadb.Client()
 collection = client.get_or_create_collection(COLLECTION_NAME)
-model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer(MODEL_NAME)
 
-def query_text(text, top_k=TOP_K):
-    
-    if collection.count() == 0:
-        print("[!] La colección está vacía. Ejecuta build_index.py primero.")
-        return []
+def build_index():
+    if not os.path.exists(VAULT_PATH):
+        print(f"[!] No se encontró {VAULT_PATH}")
+        return
 
-    emb = model.encode(text).tolist()
+    with open(VAULT_PATH, "r", encoding="utf-8") as f:
+        notas = json.load(f)
 
-    results = collection.query(
-        query_embeddings=[emb],
-        n_results=top_k
-    )
+    if not notas:
+        print("[!] No hay notas para indexar")
+        return
 
-    docs = []
-    documents = results.get('documents', [[]])[0]
-    metadatas = results.get('metadatas', [[]])[0]
+    ids = []
+    embeddings = []
+    metadatas = []
+    documents = []
+
+    for i, nota in enumerate(notas):
+        texto = nota.get("texto", "")
+        if not texto.strip():
+            continue
+
+        emb = model.encode(texto).tolist()
+        embeddings.append(emb)
+        documents.append(texto)
+        metadatas.append({
+            "ruta": nota.get("ruta", "Desconocida"),
+            "tipo": nota.get("tipo", "Desconocido")
+        })
+        ids.append(f"doc_{i}")
 
     if not documents:
-        print("[!] No se encontraron resultados para tu búsqueda.")
-        return []
+        print("[!] No se generaron documentos válidos para indexar")
+        return
 
-    for doc, metadata in zip(documents, metadatas):
-        docs.append({
-            "texto": doc,
-            "ruta": metadata.get("ruta", "Desconocida"),
-            "tipo": metadata.get("tipo", "Desconocido")
-        })
+    collection.add(
+        ids=ids,
+        documents=documents,
+        metadatas=metadatas,
+        embeddings=embeddings
+    )
 
-    print(f"[+] Se encontraron {len(docs)} resultados.")
-    return docs
+    print(f"[+] Se indexaron {len(documents)} documentos exitosamente.")
 
 if __name__ == "__main__":
-    while True:
-        try:
-            pregunta = input("🔹 Qué quieres buscar? (escribe 'salir' para terminar) ")
-            if pregunta.lower() in {"salir", "exit"}:
-                break
-
-            resultados = query_text(pregunta)
-
-            for i, r in enumerate(resultados, 1):
-                preview = r['texto'][:PREVIEW_LENGTH].replace("\n", " ")
-                print(f"{i}. [{r['tipo']}] {r['ruta']}: {preview}...")
-
-        except KeyboardInterrupt:
-            print("\n[!] Interrupción manual. Saliendo...")
-            break
-        except Exception as e:
-            print(f"[!] Error inesperado: {e}")
+    build_index()
