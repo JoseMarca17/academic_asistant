@@ -4,12 +4,19 @@ import chromadb
 from sentence_transformers import SentenceTransformer
 
 COLLECTION_NAME = "academic_knowledge"
-VAULT_PATH = "data/processed/unified.json"  
+VAULT_PATH = "data/processed/unified.json"
+CHROMA_PATH = "data/chroma"
 MODEL_NAME = "all-MiniLM-L6-v2"
 
-client = chromadb.Client()
+client = chromadb.Client(
+    settings=chromadb.Settings(
+        persist_directory=CHROMA_PATH
+    )
+)
+
 collection = client.get_or_create_collection(COLLECTION_NAME)
 model = SentenceTransformer(MODEL_NAME)
+
 
 def build_index():
     if not os.path.exists(VAULT_PATH):
@@ -25,22 +32,23 @@ def build_index():
 
     ids = []
     embeddings = []
-    metadatas = []
     documents = []
+    metadatas = []
 
     for i, nota in enumerate(notas):
-        texto = nota.get("texto", "")
-        if not texto.strip():
+        texto = nota.get("contenido", "").strip()
+        if not texto:
             continue
 
         emb = model.encode(texto).tolist()
+
+        ids.append(f"doc_{i}")
         embeddings.append(emb)
         documents.append(texto)
         metadatas.append({
             "ruta": nota.get("ruta", "Desconocida"),
             "tipo": nota.get("tipo", "Desconocido")
         })
-        ids.append(f"doc_{i}")
 
     if not documents:
         print("[!] No se generaron documentos válidos para indexar")
@@ -53,7 +61,9 @@ def build_index():
         embeddings=embeddings
     )
 
+
     print(f"[+] Se indexaron {len(documents)} documentos exitosamente.")
+
 
 if __name__ == "__main__":
     build_index()
