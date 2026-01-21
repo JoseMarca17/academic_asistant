@@ -2,53 +2,138 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Academic Assistant Pro</title>
+    <title>Academic Assistant</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    
 </head>
 <body>
     <h1>Academic Assistant</h1>
+    
     <form id="formBusqueda">
-        <input type="text" id="inputPregunta" placeholder="Realiza tu consulta">
+        <input type="text" id="inputPregunta" placeholder="Realiza tu consulta o usa el micrófono" style="width: 70%; padding: 8px;">
         <button type="submit">Preguntar</button>
+        <button type="button" id="btnDictar">🎤 Dictar Pregunta</button>
     </form> 
 
     <div id="contenedorRespuesta"></div>
     
-    <div class="fuentes-lista">
+    <div class="fuentes-lista" style="margin-top: 20px;">
         <strong>Fuentes consultadas:</strong>
         <ul id="fuentes"></ul>
     </div>
 
+    <div style="margin-top: 10px;">
+        <button type="button" id="btnSilenciarVoz" style="display:none;">Silenciar Asistente</button>
+    </div>
+
     <script>
-        document.getElementById('formBusqueda').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const textoUsuario = document.getElementById('inputPregunta').value;
-        const contenedor = document.getElementById('contenedorRespuesta');
-        const listaFuentes = document.getElementById('fuentes');
+        const synth = window.speechSynthesis;
+        const btnDictar = document.getElementById('btnDictar');
+        const btnSilenciar = document.getElementById('btnSilenciarVoz');
+        const inputPregunta = document.getElementById('inputPregunta');
+        const form = document.getElementById('formBusqueda');
 
-        contenedor.innerHTML = "Consultando...";
+        let recognition;
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'es-ES';
+            recognition.continuous = false; 
+            recognition.interimResults = false; 
+            recognition.maxAlternatives = 1;
 
-        try {
-            const response = await fetch('/ask', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: textoUsuario }) 
-            });
-            
-            const data = await response.json();
-            
-            if (response.ok) {
-                contenedor.innerHTML = marked.parse(data.answer); 
-                listaFuentes.innerHTML = data.sources.map(f => `<li>${f}</li>`).join('');
-            } else {
-                contenedor.innerHTML = "Error del servidor: " + data.detail;
-            }
-        } catch (error) {
-            contenedor.innerHTML = "Error de conexión: " + error.message;
+            recognition.onstart = () => {
+                btnDictar.innerText = "🔴 Escuchando...";
+                btnDictar.style.backgroundColor = "#ffcccc";
+                console.log("Micrófono activado...");
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                inputPregunta.value = transcript;
+                console.log("Texto detectado:", transcript);
+                form.dispatchEvent(new Event('submit'));
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Error detectado: ", event.error);
+                btnDictar.innerText = "🎤 Dictar Pregunta";
+                btnDictar.style.backgroundColor = "";
+                
+                if(event.error === 'no-speech') {
+                    alert("No detecté voz. Intenta hablar inmediatamente después de pulsar.");
+                } else if (event.error === 'not-allowed') {
+                    alert("Permiso de micrófono denegado. Revisa la configuración del navegador.");
+                }
+            };
+
+            recognition.onend = () => {
+                btnDictar.innerText = "🎤 Dictar Pregunta";
+                btnDictar.style.backgroundColor = "";
+            };
+
+            btnDictar.onclick = () => {
+                synth.cancel();
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.log("Reconocimiento ya estaba activo o error al iniciar.");
+                }
+            };
         }
-    });
+
+        function hablarAsistente(texto) {
+            const textoLimpio = texto
+                .replace(/[#*`]/g, '')           
+                .replace(/\[.*?\]/g, '')       
+                .replace(/```[\s\S]*?```/g, 'bloque de código');
+
+            const utterance = new SpeechSynthesisUtterance(textoLimpio);
+            utterance.lang = 'es-ES';
+            utterance.rate = 1.0; 
+
+            utterance.onstart = () => btnSilenciar.style.display = 'inline';
+            utterance.onend = () => btnSilenciar.style.display = 'none';
+
+            synth.speak(utterance);
+        }
+
+        btnSilenciar.onclick = () => {
+            synth.cancel();
+            btnSilenciar.style.display = 'none';
+        };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const textoUsuario = inputPregunta.value;
+            const contenedor = document.getElementById('contenedorRespuesta');
+            const listaFuentes = document.getElementById('fuentes');
+
+            if (!textoUsuario) return;
+
+            synth.cancel();
+            contenedor.innerHTML = "<em>Procesando tu pregunta...</em>";
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: textoUsuario }) 
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    contenedor.innerHTML = marked.parse(data.answer); 
+                    listaFuentes.innerHTML = data.sources.map(f => `<li>${f}</li>`).join('');
+                    hablarAsistente(data.answer);
+                } else {
+                    contenedor.innerHTML = "Error del servidor: " + data.detail;
+                }
+            } catch (error) {
+                contenedor.innerHTML = "Error de conexión: " + error.message;
+            }
+        });
     </script>
 </body>
 </html>
