@@ -1,4 +1,5 @@
 import os
+import re
 import json
 from config import Config
 
@@ -9,7 +10,11 @@ def load_json(path):
         return json.load(f)
 
 def clean_text(text):
-    return " ".join(text.split())
+    text = re.sub(r'```mermaid.*?```', '', text, flags=re.DOTALL)
+    text = re.sub(r'<[^>]*>', '', text)
+    text = re.sub(r'%%.*?%%', '', text, flags=re.DOTALL)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
 
 def unify():
     unified = []
