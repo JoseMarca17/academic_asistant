@@ -5,8 +5,18 @@ from config import Config
 
 def split_text(text, chunk_size, overlap):
     chunks = []
-    for i in range(0, len(text), chunk_size - overlap):
-        chunks.append(text[i:i + chunk_size])
+    start = 0 
+    
+    while start < len(text):
+        end = start + chunk_size
+        if end < len(text):
+            last_break =  text.rfind(".", start, end)
+            if last_break == -1:
+                last_break = text.rfind("\n", start, end)
+            if last_break != -1 and last_break > start + (chunk_size // 2):
+                end = last_break + 1 
+        chunks.append(text[start:end].strip())
+        start =  end -  overlap
     return chunks
 
 def build_index():
