@@ -1,34 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Academic Asistant</title>
+    <title>Academic Assistant Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
 </head>
 <body>
-    <h1>Academic Chat</h1>
+    <h1>Academic Assistant</h1>
     <form id="formBusqueda">
-        <input type="text" id="texto" placeholder="Realiza tu consulta">
-        <button type="submit">Buscar</button>
+        <input type="text" id="inputPregunta" placeholder="Realiza tu consulta">
+        <button type="submit">Preguntar</button>
     </form> 
 
-    <pre id="resultado"></pre>
+    <div id="contenedorRespuesta"></div>
+    
+    <div class="fuentes-lista">
+        <strong>Fuentes consultadas:</strong>
+        <ul id="fuentes"></ul>
+    </div>
 
     <script>
-        document.getElementById("formBusqueda").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const texto = document.getElementById("texto").value;
-            const res = await fetch("/query", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ texto })
+        document.getElementById('formBusqueda').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const textoUsuario = document.getElementById('inputPregunta').value;
+        const contenedor = document.getElementById('contenedorRespuesta');
+        const listaFuentes = document.getElementById('fuentes');
+
+        contenedor.innerHTML = "Consultando...";
+
+        try {
+            const response = await fetch('/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: textoUsuario }) 
             });
-            const data = await res.json();
-            document.getElementById("resultado").textContent = JSON.stringify(data, null, 2)
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                contenedor.innerHTML = marked.parse(data.answer); 
+                listaFuentes.innerHTML = data.sources.map(f => `<li>${f}</li>`).join('');
+            } else {
+                contenedor.innerHTML = "Error del servidor: " + data.detail;
+            }
+        } catch (error) {
+            contenedor.innerHTML = "Error de conexión: " + error.message;
         }
-    ) 
+    });
     </script>
 </body>
 </html>

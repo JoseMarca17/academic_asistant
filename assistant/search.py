@@ -1,62 +1,37 @@
 import chromadb
 from sentence_transformers import SentenceTransformer
+from config import Config
 
-COLLECTION_NAME = "academic_knowledge"
-CHROMA_PATH = "data/chroma"
-MODEL_NAME = "all-MiniLM-L6-v2"
+client = chromadb.PersistentClient(path=Config.CHROMA_PATH)
+collection = client.get_or_create_collection("academic_knowledge")
+model = SentenceTransformer(Config.MODEL_NAME)
 
-client = chromadb.Client(
-    settings=chromadb.Settings(
-        persist_directory=CHROMA_PATH
-    )
-)
+def query_text(text, top_k=None):
+    if top_k is None:
+        top_k = Config.TOP_K_RESULTS
 
-collection = client.get_or_create_collection(COLLECTION_NAME)
-model = SentenceTransformer(MODEL_NAME)
+    if collection.count() == 0:
+        return []
 
-
-def query_text(text, top_k=3):
-
-    total_docs = collection.count()
-    if total_docs == 0:
-        return [{
-            "texto": "No hay documentos indexados aún.",
-            "ruta": "",
-            "tipo": ""
-        }]
-
-    emb = model.encode(text).tolist()
+    query_emb = model.encode(text).tolist()
 
     results = collection.query(
-        query_embeddings=[emb],
+        query_embeddings=[query_emb],
         n_results=top_k
     )
 
-    docs = []
-
-    documents = results.get("documents", [[]])[0]
-    metadatas = results.get("metadatas", [[]])[0]
-
-    if not documents:
-        return [{
-            "texto": "No se encontró nada relevante para tu consulta.",
-            "ruta": "",
-            "tipo": ""
-        }]
-
-    for doc, metadata in zip(documents, metadatas):
-        docs.append({
+    formatted_results = []
+    for doc, meta in zip(results['documents'][0], results['metadatas'][0]):
+        formatted_results.append({
             "texto": doc,
-            "ruta": metadata.get("ruta", ""),
-            "tipo": metadata.get("tipo", "")
+            "ruta": meta['ruta'],
+            "tipo": meta['tipo']
         })
-
-    return docs
-
+    
+    return formatted_results
 
 if __name__ == "__main__":
-    pregunta = input("¿Qué quieres buscar? ")
-    resultados = query_text(pregunta)
-
-    for r in resultados:
-        print(f"-> [{r['tipo']}] {r['ruta']}: {r['texto'][:200]}...")
+    pregunta = input("Pregunta a tus apuntes: ")
+    res = query_text(pregunta)
+    for r in res:
+        print(f"\n[{r['tipo']}] -> {r['ruta']}\n{r['texto'][:300]}...\n{'-'*50}")

@@ -1,69 +1,52 @@
-import os
 import json
 import chromadb
 from sentence_transformers import SentenceTransformer
+from config import Config
 
-COLLECTION_NAME = "academic_knowledge"
-VAULT_PATH = "data/processed/unified.json"
-CHROMA_PATH = "data/chroma"
-MODEL_NAME = "all-MiniLM-L6-v2"
-
-client = chromadb.Client(
-    settings=chromadb.Settings(
-        persist_directory=CHROMA_PATH
-    )
-)
-
-collection = client.get_or_create_collection(COLLECTION_NAME)
-model = SentenceTransformer(MODEL_NAME)
-
+def split_text(text, chunk_size, overlap):
+    chunks = []
+    for i in range(0, len(text), chunk_size - overlap):
+        chunks.append(text[i:i + chunk_size])
+    return chunks
 
 def build_index():
-    if not os.path.exists(VAULT_PATH):
-        print(f"[!] No se encontró {VAULT_PATH}")
+    if not Config.UNIFIED_JSON.exists():
+        print(f"[!] No se encontró {Config.UNIFIED_JSON}")
         return
 
-    with open(VAULT_PATH, "r", encoding="utf-8") as f:
+    with open(Config.UNIFIED_JSON, "r", encoding="utf-8") as f:
         notas = json.load(f)
 
-    if not notas:
-        print("[!] No hay notas para indexar")
-        return
+    client = chromadb.PersistentClient(path=Config.CHROMA_PATH)
+    collection = client.get_or_create_collection("academic_knowledge")
+    model = SentenceTransformer(Config.MODEL_NAME)
 
-    ids = []
-    embeddings = []
-    documents = []
-    metadatas = []
+    ids, embeddings, documents, metadatas = [], [], [], []
 
-    for i, nota in enumerate(notas):
-        texto = nota.get("contenido", "").strip()
-        if not texto:
-            continue
+    for nota in notas:
+        texto = nota.get("contenido", "")
+        if len(texto) < 10: continue
 
-        emb = model.encode(texto).tolist()
-
-        ids.append(f"doc_{i}")
-        embeddings.append(emb)
-        documents.append(texto)
-        metadatas.append({
-            "ruta": nota.get("ruta", "Desconocida"),
-            "tipo": nota.get("tipo", "Desconocido")
-        })
-
-    if not documents:
-        print("[!] No se generaron documentos válidos para indexar")
-        return
+        chunks = split_text(texto, Config.CHUNK_SIZE, Config.CHUNK_OVERLAP)
+        
+        for i, chunk in enumerate(chunks):
+            chunk_id = f"{nota['id']}_ch_{i}"
+            
+            ids.append(chunk_id)
+            documents.append(chunk)
+            embeddings.append(model.encode(chunk).tolist())
+            metadatas.append({
+                "ruta": nota["ruta"],
+                "tipo": nota["tipo"]
+            })
 
     collection.add(
-        ids=ids,
-        documents=documents,
-        metadatas=metadatas,
+        ids=ids, 
+        documents=documents, 
+        metadatas=metadatas, 
         embeddings=embeddings
     )
-
-
-    print(f"[+] Se indexaron {len(documents)} documentos exitosamente.")
-
+    print(f"[+] Éxito: {len(documents)} fragmentos indexados en ChromaDB.")
 
 if __name__ == "__main__":
     build_index()

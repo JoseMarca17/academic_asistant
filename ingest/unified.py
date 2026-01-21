@@ -1,41 +1,36 @@
-import os 
+import os
 import json
-
-NOTES_PATH = "data/processed/notas.json"
-PDFS_PATH = "data/processed/pdfs.json"
-OUTPUT_PATH = "data/processed/unified.json"
+from config import Config
 
 def load_json(path):
+    if not os.path.exists(path):
+        return []
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+def clean_text(text):
+    return " ".join(text.split())
+
 def unify():
     unified = []
+    notes = load_json(Config.PROCESSED_DIR / "notas.json")
+    pdfs = load_json(Config.PROCESSED_DIR / "pdfs.json")
     
-    notes = load_json(NOTES_PATH)
-    pdfs = load_json(PDFS_PATH)
-    
-    for note in notes:
+    for idx, note in enumerate(notes + pdfs):
+        tipo = "md" if "metadata" in note else "pdf"
         unified.append({
-            "tipo": "md",
-            "ruta": note["ruta"],
-            "metadata": note.get("metadata", {}),
-            "contenido": note["contenido"]
+            "id": f"doc_{idx}",
+            "tipo": tipo,
+            "ruta": str(note["ruta"]),
+            "contenido": clean_text(note["contenido"]),
+            "metadata": note.get("metadata", {})
         })
     
-    for pdf in pdfs:
-        unified.append({
-            "tipo": "pdf",
-            "ruta": pdf["ruta"],
-            "metadata": {},
-            "contenido": pdf["contenido"]
-        })
+    os.makedirs(Config.PROCESSED_DIR, exist_ok=True)
+    with open(Config.UNIFIED_JSON, "w", encoding="utf-8") as f:
+        json.dump(unified, f, indent=4, ensure_ascii=False)
     
-    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
-    with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
-        json.dump(unified, f, indent=4, ensure_ascii=True)
-    
-    print(f"[+] Dataset unificado: {len(unified)} documentos")
+    print(f"[+] Dataset unificado: {len(unified)} documentos en {Config.UNIFIED_JSON}")
 
 if __name__ == "__main__":
     unify()
