@@ -1,32 +1,39 @@
 from google import genai
 from config import Config
 
-# Inicializamos el cliente
 client = genai.Client(api_key=Config.GEMINI_API_KEY)
 
-def get_ai_answer(question, search_results):
-    # Consolidamos el contexto (esto ya lo tenías bien)
+def get_ai_answer(question, search_results, history =[]):
     contextText = ""
     for r in search_results:
         contextText += f"\n--- FUENTE: {r['ruta']} ({r['tipo']}) ---\n{r['texto']}\n"
 
-    prompt = f"""
-    Actúa como un tutor académico experto y un poco sarcástico. 
-    Responde usando este contexto de mis apuntes:
+    contents = [
+        {
+            "role": "user", 
+            "parts": [{"text": f"Contexto de mis apuntes:\n{contextText}"}]
+        },
+        {
+            "role": "model", 
+            "parts": [{"text": "Entendido. Responderé basado en tus notas con un toque sarcástico."}]
+        }
+    ]
     
-    {contextText}
-    
-    Pregunta: {question}
-    
-    Reglas: Si no está en las notas, dímelo con un comentario ácido pero ayúdame igual. 
-    Usa Markdown para el código.
-    """
+    for msg in history:
+        role = "user" if msg["role"] == "user" else "model"
+        contents.append({
+            "role": role,
+            "parts": [{"text": msg["content"]}]
+        })
 
-    # CAMBIO AQUÍ: Probemos quitando el prefijo 'models/' si es que lo tenías, 
-    # o simplemente asegurando el nombre directo.
+    contents.append({
+        "role": "user",
+        "parts": [{"text": question}]
+    })
+
     response = client.models.generate_content(
-        model=Config.GEMINI_MODEL, 
-        contents=prompt
+        model=Config.GEMINI_MODEL,
+        contents=contents
     )
     
     return response.text

@@ -2,28 +2,33 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Academic Assistant</title>
+    <title>Academic Assistant Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body>
-    <h1>Academic Assistant</h1>
+<body style="font-family: Arial, sans-serif; padding: 20px;">
+    
+    <div style="background: #f0f0f0; padding: 15px; margin-bottom: 20px; border-radius: 8px;">
+        <strong>Panel de Administración:</strong>
+        <button type="button" onclick="actualizarApuntes()">🔄 Procesar Mis Notas</button>
+        <button type="button" onclick="limpiarChat()">🗑️ Resetear Conversación</button>
+    </div>
+
+    <h1>🧠 Academic Assistant</h1>
     
     <form id="formBusqueda">
-        <input type="text" id="inputPregunta" placeholder="Realiza tu consulta o usa el micrófono" style="width: 70%; padding: 8px;">
-        <button type="submit">Preguntar</button>
-        <button type="button" id="btnDictar">🎤 Dictar Pregunta</button>
+        <input type="text" id="inputPregunta" placeholder="Haz una pregunta o usa el micro..." style="width: 60%; padding: 10px;">
+        <button type="submit" style="padding: 10px;">Enviar</button>
+        <button type="button" id="btnDictar" style="padding: 10px;">🎤 Dictar</button>
     </form> 
 
-    <div id="contenedorRespuesta"></div>
+    <div id="contenedorRespuesta" style="margin-top: 20px; min-height: 150px; border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: #fff;"></div>
     
-    <div class="fuentes-lista" style="margin-top: 20px;">
-        <strong>Fuentes consultadas:</strong>
+    <div style="margin-top: 20px; font-size: 0.9em; color: #555;">
+        <strong>Fuentes:</strong>
         <ul id="fuentes"></ul>
     </div>
 
-    <div style="margin-top: 10px;">
-        <button type="button" id="btnSilenciarVoz" style="display:none;">Silenciar Asistente</button>
-    </div>
+    <button type="button" id="btnSilenciarVoz" style="display:none; margin-top: 10px;">🔇 Detener Voz</button>
 
     <script>
         const synth = window.speechSynthesis;
@@ -31,17 +36,37 @@
         const btnSilenciar = document.getElementById('btnSilenciarVoz');
         const inputPregunta = document.getElementById('inputPregunta');
         const form = document.getElementById('formBusqueda');
+        const contenedor = document.getElementById('contenedorRespuesta');
+        const listaFuentes = document.getElementById('fuentes');
 
+        let chatHistory = [];
         let recognition;
         let isListening = false;
-        let manualStop = false; 
+        let manualStop = false;
+
+        async function actualizarApuntes() {
+            if(!confirm("Esto limpiará y volverá a indexar tus notas. ¿Continuar?")) return;
+            contenedor.innerHTML = "<em>Unificando y limpiando archivos...</em>";
+            try {
+                const resp = await fetch('/admin/unify', { method: 'POST' });
+                const data = await resp.json();
+                alert(data.message);
+                contenedor.innerHTML = "";
+            } catch (e) { alert("Error: " + e.message); }
+        }
+
+        function limpiarChat() {
+            chatHistory = [];
+            contenedor.innerHTML = "<em>Memoria del chat borrada.</em>";
+            listaFuentes.innerHTML = "";
+            synth.cancel();
+        }
 
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
-            
             recognition.lang = 'es-ES';
-            recognition.continuous = true; 
+            recognition.continuous = true;
             recognition.interimResults = true;
 
             recognition.onstart = () => {
@@ -49,7 +74,6 @@
                 manualStop = false;
                 btnDictar.innerText = "🛑 Detener y Enviar";
                 btnDictar.style.backgroundColor = "#ff4d4d";
-                inputPregunta.placeholder = "Escuchando... no te detengas.";
             };
 
             recognition.onresult = (event) => {
@@ -62,38 +86,19 @@
 
             recognition.onend = () => {
                 if (isListening && !manualStop) {
-                    console.log("Reinicio automático del micro...");
                     recognition.start(); 
                 } else {
-                    detenerInterfaz();
+                    btnDictar.innerText = "🎤 Dictar";
+                    btnDictar.style.backgroundColor = "";
                 }
             };
 
-            recognition.onerror = (event) => {
-                console.error("Error micro:", event.error);
-                if (event.error === 'no-speech') return; 
-                detenerReconocimiento();
-            };
-
-            function detenerInterfaz() {
-                isListening = false;
-                btnDictar.innerText = "🎤 Dictar Pregunta";
-                btnDictar.style.backgroundColor = "";
-                inputPregunta.placeholder = "Realiza tu consulta";
-            }
-
-            function detenerReconocimiento() {
-                manualStop = true;
-                isListening = false;
-                recognition.stop();
-            }
-
             btnDictar.onclick = () => {
                 if (isListening) {
-                    detenerReconocimiento();
-                    if (inputPregunta.value.trim() !== "") {
-                        form.dispatchEvent(new Event('submit'));
-                    }
+                    manualStop = true;
+                    isListening = false;
+                    recognition.stop();
+                    if (inputPregunta.value.trim() !== "") form.dispatchEvent(new Event('submit'));
                 } else {
                     synth.cancel();
                     inputPregunta.value = "";
@@ -102,11 +107,10 @@
             };
         }
         
-        function hablarAsistente(texto) {
-            const textoLimpio = texto.replace(/[#*`]/g, '').replace(/\[.*?\]/g, '').replace(/```[\s\S]*?```/g, 'bloque de código');
-            const utterance = new SpeechSynthesisUtterance(textoLimpio);
+        function hablar(texto) {
+            const utterance = new SpeechSynthesisUtterance(texto.replace(/[#*`]/g, ''));
             utterance.lang = 'es-ES';
-            utterance.onstart = () => btnSilenciar.style.display = 'inline';
+            utterance.onstart = () => btnSilenciar.style.display = 'block';
             utterance.onend = () => btnSilenciar.style.display = 'none';
             synth.speak(utterance);
         }
@@ -115,29 +119,32 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const textoUsuario = inputPregunta.value;
-            const contenedor = document.getElementById('contenedorRespuesta');
-            const listaFuentes = document.getElementById('fuentes');
-            if (!textoUsuario) return;
+            const pregunta = inputPregunta.value;
+            if (!pregunta) return;
 
             synth.cancel();
-            contenedor.innerHTML = "<em>Procesando...</em>";
+            contenedor.innerHTML = "<em>Generando respuesta...</em>";
 
             try {
                 const response = await fetch('/ask', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question: textoUsuario }) 
+                    body: JSON.stringify({ question: pregunta, history: chatHistory }) 
                 });
+                
                 const data = await response.json();
                 if (response.ok) {
+                    // Actualizar UI y Memoria
                     contenedor.innerHTML = marked.parse(data.answer); 
                     listaFuentes.innerHTML = data.sources.map(f => `<li>${f}</li>`).join('');
-                    hablarAsistente(data.answer);
+                    
+                    chatHistory.push({ role: "user", content: pregunta });
+                    chatHistory.push({ role: "model", content: data.answer });
+
+                    hablar(data.answer);
+                    inputPregunta.value = "";
                 }
-            } catch (error) {
-                contenedor.innerHTML = "Error: " + error.message;
-            }
+            } catch (error) { contenedor.innerHTML = "Error: " + error.message; }
         });
     </script>
 </body>
