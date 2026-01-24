@@ -6,7 +6,6 @@ const listaFuentes = document.getElementById('fuentes');
 const listaConversaciones = document.getElementById('lista-preguntas');
 const btnDictar = document.getElementById('btnDictar');
 const btnSilenciar = document.getElementById('btnSilenciarVoz');
-
 let chatHistory = [];
 let currentChatId = null;
 let targetChatId = null;
