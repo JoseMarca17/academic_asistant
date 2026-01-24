@@ -31,9 +31,13 @@ def get_ai_answer(question, search_results, history =[]):
         "parts": [{"text": question}]
     })
 
-    response = client.models.generate_content(
-        model=Config.GEMINI_MODEL,
-        contents=contents
-    )
-    
-    return response.text
+    try:
+        response = client.models.generate_content(
+            model=Config.GEMINI_MODEL,
+            contents=contents
+        )
+        
+        return response.text
+    except Exception as e:
+        print(f"Error en Gemini API: {e}")
+        return "Hubo un error al consultar a mi cerebro digital. Inténtalo de nuevo."
