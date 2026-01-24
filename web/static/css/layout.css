@@ -1,0 +1,92 @@
+:root {
+    --header-h: 60px;
+    --footer-h: 30px;
+    --sidebar-w: 280px;
+    --bg-dark: #202123;
+    --bg-main: #343541;
+    --border: #4d4d4d;
+    --accent: #10a37f;
+}
+
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+}
+
+body { 
+    font-family: 'Segoe UI', sans-serif; 
+    background: var(--bg-main); 
+    color: white; 
+    overflow: hidden; 
+}
+
+#main-header {
+    height: var(--header-h);
+    background: var(--bg-dark);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+    z-index: 1000;
+}
+
+#main-container { 
+    display: flex; 
+    height: calc(100vh - var(--header-h) - var(--footer-h)); 
+}
+
+#sidebar {
+    width: var(--sidebar-w);
+    background: var(--bg-dark);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column; 
+    padding: 15px;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+#sidebar.collapsed {
+    width: 0;
+    padding: 0;
+    opacity: 0;
+    border: none;
+}
+
+#lista-preguntas {
+    flex: 1;
+    overflow-y: auto; 
+    margin-top: 10px;
+    padding-right: 5px;
+}
+
+#lista-preguntas::-webkit-scrollbar { 
+    width: 4px; 
+}
+
+#lista-preguntas::-webkit-scrollbar-thumb { 
+    background: #4d4d4d; 
+    border-radius: 10px; 
+}
+
+#chat-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    min-width: 0;
+}
+
+#main-footer {
+    height: var(--footer-h);
+    background: var(--bg-dark);
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #8e8ea0;
+    z-index: 1000;
+}
